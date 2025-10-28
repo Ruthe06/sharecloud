@@ -1,21 +1,21 @@
 const express = require('express');
 const http = require('http');
-const socketIo = require('socket.io');
 const path = require('path');
+const socketIo = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Serve static files from the FRONTEND folder (one directory up from backend!)
-app.use(express.json());
 app.use(express.static(path.join(__dirname, 'frontend')));
 
-app.get('*', (req, res) => {
+// Fallback route
+app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
 });
-io.on('connection', (socket) => {
-  // ... socket.io logic ...
+
+io.on('connection', socket => {
+  // your socket.io handlers
 });
 
 const PORT = process.env.PORT || 3000;
