@@ -7,17 +7,16 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Serve static files from 'frontend' directory
-app.use(express.static(path.join(__dirname, 'frontend')));
+// Serve static files from the FRONTEND folder (one directory up from backend!)
+app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
-// Fallback: send index.html on all unknown routes (for SPA/pages without extension)
+// Fallback for SPA
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
+  res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
 });
 
-// Socket.io routes & logic
 io.on('connection', (socket) => {
-  // ... (your socket.io logic unchanged)
+  // ... socket.io logic ...
 });
 
 const PORT = process.env.PORT || 3000;
