@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CloudSync Express</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-b from-blue-50 via-slate-50 to-white min-h-screen">
+
+<header class="bg-blue-900 text-white py-5 px-6 shadow flex items-center justify-between">
+  <span class="text-2xl font-extrabold tracking-tight">CloudSync Express</span>
+  <span class="opacity-80 font-medium text-sm space-x-4">
+    <a href="#" class="hover:underline">Settings</a>
+    <a href="#" class="ml-3 hover:underline">Help</a>
+  </span>
+</header>
+
+<main class="max-w-xl mx-auto my-9 bg-white rounded-2xl shadow-lg p-0">
+  <section id="senderSection" class="p-8">
+    <div id="drop-area" class="w-full flex flex-col justify-center items-center p-7 border-2 border-dashed border-blue-300 bg-blue-50 rounded-xl cursor-pointer transition hover:bg-blue-100"
+         onclick="fileInput && fileInput.click()" ondragover="event.preventDefault();">
+      <svg class="w-10 h-10 mb-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12v6m0 0l-3-3m3 3l3-3m-7-7a4 4 0 118 0v4"></path>
+      </svg>
+      <input id="fileInput" class="hidden" type="file" />
+      <span id="fileLabel" class="mb-2 text-blue-700 font-medium">Select, or drag & drop file</span>
+      <span class="text-slate-400 text-sm">Max size: 100MB</span>
+    </div>
+    <button onclick="generateShareLink()" class="w-full mt-5 py-3 rounded bg-blue-500 hover:bg-blue-600 text-white font-bold transition">Generate Sharing Link</button>
+    <div id="shareArea" class="mt-5"></div>
+    <div id="sendFileInfo" class="mt-7 hidden">
+      <span id="sendFileName" class="text-blue-900 font-semibold"></span>
+      <span id="sendFileType" class="text-blue-600 text-xs pl-2"></span>
+      <div class="w-full bg-blue-100 rounded h-3 mb-1 mt-2">
+        <div id="sendProgress" class="bg-blue-600 h-3 rounded transition-all" style="width:0%"></div>
+      </div>
+      <div id="sendPercent" class="text-blue-900 font-bold"></div>
+    </div>
+  </section>
+  <section id="receiverSection" class="p-8 hidden">
+    <div id="fileInfo" class="mb-3 hidden">
+      <span id="fileName" class="text-blue-900 font-semibold"></span>
+      <span id="fileType" class="text-blue-600 text-xs pl-2"></span>
+    </div>
+    <div class="w-full bg-blue-100 rounded h-3 mb-4">
+      <div id="recvProgress" class="bg-blue-600 h-3 rounded transition-all" style="width:0%"></div>
+    </div>
+    <div id="recvPercent" class="text-blue-900 font-bold mb-2"></div>
+    <div class="mb-4 text-blue-800 font-semibold text-lg" id="receiverStatus">Getting ready…</div>
+    <a id="downloadLink" class="hidden text-center w-full block py-3 rounded bg-green-200 font-semibold text-green-900 transition mt-3" download>Download File</a>
+  </section>
+</main>
+
+<footer class="mt-20 bg-blue-900 text-blue-100 py-6 text-center text-base rounded-t-2xl">
+  Privacy Policy | Terms of Service | Contact Us | <a href="#" class="underline">GitHub</a>
+  <br><span class="text-xs">© 2024 CloudSync Express. All rights reserved.</span>
+</footer>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
