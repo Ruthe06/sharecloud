@@ -1,17 +1,16 @@
 {
-  "name": "backend",
+  "name": "sharecloud",
   "version": "1.0.0",
-  "description": "",
+  "description": "Node.js static + socket.io app for file sharing on Render",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
-    "express": "^5.1.0",
-    "socket.io": "^4.8.1"
+    "express": "^5.0.0-beta.1",
+    "socket.io": "^4.7.4"
   }
 }
