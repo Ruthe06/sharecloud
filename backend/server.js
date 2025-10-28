@@ -11,7 +11,7 @@ const io = socketIo(server);
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 // Fallback for SPA
-app.get('*', (req, res) => {
+app.get('/*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
 });
 
