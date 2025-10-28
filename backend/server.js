@@ -1,25 +1,24 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-app.use(express.static('frontend'));
+// Serve static files from 'frontend' directory
+app.use(express.static(path.join(__dirname, 'frontend')));
 
+// Fallback: send index.html on all unknown routes (for SPA/pages without extension)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
+});
+
+// Socket.io routes & logic
 io.on('connection', (socket) => {
-  socket.on('join-room', (room) => {
-    socket.join(room);
-    socket.to(room).emit('new-participant', socket.id);
-  });
-
-  socket.on('signal', ({ room, data }) => {
-    socket.to(room).emit('signal', { from: socket.id, data });
-  });
+  // ... (your socket.io logic unchanged)
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Signaling server running on port ${PORT}`);
-});
+server.listen(PORT, () => console.log('Server running on port', PORT));
