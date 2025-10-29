@@ -1,7 +1,6 @@
 const socket = io('https://sharecloud-1.onrender.com');
 let peerConnection, dataChannel, fileReader, currentRoom;
 let receiveBuffer = [], receivedSize = 0, chunkSize = 128 * 1024, expectedSize = 0, fileMeta = {};
-
 const fileInput = document.getElementById('fileInput');
 const fileLabel = document.getElementById('fileLabel');
 const senderSection = document.getElementById('senderSection');
