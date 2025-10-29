@@ -62,7 +62,11 @@ window.sendFile = function sendFile() {
     type: file.type
   };
 
-  peerConnection = new RTCPeerConnection();
+  peerConnection = new RTCPeerConnection({
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' }
+  ]
+});
   dataChannel = peerConnection.createDataChannel('fileTransfer');
   dataChannel.binaryType = 'arraybuffer';
 
