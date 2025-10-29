@@ -1,132 +1,168 @@
-const socket = io('https://sharecloud-1.onrender.com');
-let peerConnection, dataChannel, fileReader, currentRoom;
+console.log("App loaded");
+// Connect to socket.io on current domain 
+const socket = io(location.origin);
+console.log("Socket.IO connected: ", socket);
+
+// Global state
+let peerConnection, dataChannel, currentRoom;
+let fileInput = document.getElementById('fileInput');
+let fileLabel = document.getElementById('fileLabel');
+let shareArea = document.getElementById('shareArea');
+let senderSection = document.getElementById('senderSection');
+let receiverSection = document.getElementById('receiverSection');
+let recvProgress = document.getElementById('recvProgress');
+let sendProgress = document.getElementById('sendProgress');
+// ...add other DOM refs as needed...
+
 let receiveBuffer = [], receivedSize = 0, chunkSize = 128 * 1024, expectedSize = 0, fileMeta = {};
-const fileInput = document.getElementById('fileInput');
-const fileLabel = document.getElementById('fileLabel');
-const senderSection = document.getElementById('senderSection');
-const receiverSection = document.getElementById('receiverSection');
-const receiverStatus = document.getElementById('receiverStatus');
-const downloadLink = document.getElementById('downloadLink');
-const recvProgress = document.getElementById('recvProgress');
-const recvPercent = document.getElementById('recvPercent');
-const fileInfo = document.getElementById('fileInfo');
-const fileNameSpan = document.getElementById('fileName');
-const fileTypeSpan = document.getElementById('fileType');
-const sendProgress = document.getElementById('sendProgress');
-const sendPercent = document.getElementById('sendPercent');
-const sendFileInfo = document.getElementById('sendFileInfo');
-const sendFileName = document.getElementById('sendFileName');
-const sendFileType = document.getElementById('sendFileType');
+let fileReader;
 
-fileInput.addEventListener('change', () => {
-  fileLabel.innerText = fileInput.files[0] ? fileInput.files[0].name : "Select, or drag & drop file";
-});
-
-// Generate sharing link before selecting file
 function generateShareLink() {
   currentRoom = Math.random().toString(36).substring(2, 8).toUpperCase();
   const link = `${window.location.origin}?room=${currentRoom}`;
-  document.getElementById('shareArea').innerHTML = `
-    <span class="block mb-2">Share this link:</span>
-    <input type="text" readonly class="p-2 rounded w-full bg-blue-100 font-mono mb-2" value="${link}">
-    <button onclick="navigator.clipboard.writeText('${link}')" class="px-4 py-2 bg-blue-200 rounded hover:bg-blue-300">Copy Link</button>
-    <div class="mt-6">
-      <input id="fileInput" class="block my-4" type="file" />
-      <button onclick="sendFile()" class="block px-4 py-2 bg-blue-500 rounded text-white">Start Transfer</button>
-      <span id="fileLabel" class="ml-3 text-blue-700"></span>
-    </div>
+  shareArea.innerHTML = `
+    <span>Share this link:</span>
+    <input type="text" readonly value="${link}">
+    <button onclick="navigator.clipboard.writeText('${link}')">Copy Link</button>
   `;
+  senderSection.style.display = "block";
   socket.emit('join-room', currentRoom);
+  console.log("Sender joined room", currentRoom);
+}
 
-  document.getElementById('fileInput').addEventListener('change', (e) => {
-    document.getElementById('fileLabel').innerText = e.target.files[0] ? e.target.files[0].name : "Select file";
+// SENDER: select and send file
+fileInput.addEventListener('change', function() {
+  fileLabel.textContent = fileInput.files[0] ? fileInput.files[0].name : "Select, or drag & drop file";
+});
+
+// Main send action
+function sendFile() {
+  const file = fileInput.files[0];
+  if (!file) return alert("Choose a file first!");
+
+  peerConnection = new RTCPeerConnection({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' }
+    ]
+  });
+  console.log("SEND: PeerConnection created");
+
+  dataChannel = peerConnection.createDataChannel("filetransfer");
+  dataChannel.binaryType = "arraybuffer";
+  dataChannel.onopen = () => {
+    console.log("SEND: Data channel opened");
+    sendInChunks(file);
+  };
+  dataChannel.onclose = () => console.log("SEND: Data channel closed");
+
+  peerConnection.onicecandidate = e => {
+    if (e.candidate) {
+      console.log("SEND: ICE candidate", e.candidate);
+      socket.emit('signal', { room: currentRoom, data: { candidate: e.candidate } });
+    }
+  };
+
+  peerConnection.createOffer()
+    .then(offer => {
+      console.log("SEND: Created offer");
+      return peerConnection.setLocalDescription(offer);
+    })
+    .then(() => {
+      socket.emit('signal', { room: currentRoom, data: { sdp: peerConnection.localDescription } });
+    });
+
+  socket.on('signal', async ({ data }) => {
+    console.log("SEND: Received signal", data);
+    if (data.sdp) {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+    } else if (data.candidate) {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+      console.log("SEND: ICE candidate added");
+    }
   });
 }
 
-window.sendFile = function sendFile() {
-  const fileInputElem = document.getElementById('fileInput');
-  if (!fileInputElem.files.length) {
-    alert('Select a file first!');
-    return;
-  }
-  const file = fileInputElem.files[0];
+function sendInChunks(file) {
+  let offset = 0;
+  let chunkSize = 128 * 1024;
+  const reader = new FileReader();
 
-  sendFileName.textContent = file.name;
-  sendFileType.textContent = file.type;
-  sendFileInfo.classList.remove('hidden');
-  let sentBytes = 0;
-
-  fileMeta = {
-    name: file.name,
-    size: file.size,
-    type: file.type
+  reader.onload = e => {
+    if (dataChannel.readyState !== "open") {
+      return alert("Data channel closed!");
+    }
+    dataChannel.send(e.target.result);
+    offset += e.target.result.byteLength;
+    sendProgress.value = offset / file.size;
+    if (offset < file.size) {
+      readSlice(offset);
+    } else {
+      dataChannel.close();
+      console.log("SEND: File sent, datachannel closed");
+    }
   };
 
-  peerConnection = new RTCPeerConnection({
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' }
-  ]
-});
-  dataChannel = peerConnection.createDataChannel('fileTransfer');
-  dataChannel.binaryType = 'arraybuffer';
+  const readSlice = o => {
+    const slice = file.slice(o, o + chunkSize);
+    reader.readAsArrayBuffer(slice);
+  };
 
-  dataChannel.onopen = () => {
-    // Send file meta as JSON
-    dataChannel.send(JSON.stringify({ __meta: true, ...fileMeta }));
-    let offset = 0;
-    fileReader = new FileReader();
-    fileReader.onload = e => {
-      dataChannel.send(e.target.result);
-      offset += e.target.result.byteLength;
-      sentBytes += e.target.result.byteLength;
-      // Progress bar update
-      const percent = ((sentBytes / file.size) * 100).toFixed(1);
-      sendProgress.style.width = percent + '%';
-      sendPercent.textContent = percent + '%';
-      if (percent < 5 && sentBytes > 0) {
-        sendProgress.style.width = '5%';
-        sendPercent.textContent = '5%';
-      }
-      if (offset < file.size) readSlice(offset);
-      else {
-        sendProgress.style.width = '100%';
-        sendPercent.textContent = '100%';
-        dataChannel.close();
+  readSlice(0);
+}
+
+// RECEIVER LOGIC
+window.onload = () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('room')) {
+    currentRoom = params.get('room');
+    receiverSection.style.display = "block";
+    senderSection.style.display = "none";
+    socket.emit('join-room', currentRoom);
+    console.log("RECEIVER: joined room", currentRoom);
+
+    peerConnection = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' }
+      ]
+    });
+
+    peerConnection.ondatachannel = ev => {
+      dataChannel = ev.channel;
+      dataChannel.binaryType = "arraybuffer";
+      dataChannel.onopen = () => console.log("RECV: Data channel opened");
+      dataChannel.onclose = () => console.log("RECV: Data channel closed");
+      dataChannel.onmessage = event => {
+        receiveBuffer.push(event.data);
+        receivedSize += event.data.byteLength;
+        recvProgress.value = receivedSize / expectedSize;
+        // logic to reconstruct file
+      };
+    };
+
+    peerConnection.onicecandidate = e => {
+      if (e.candidate) {
+        socket.emit('signal', { room: currentRoom, data: { candidate: e.candidate } });
+        console.log("RECV: ICE candidate", e.candidate);
       }
     };
-    function readSlice(o) {
-      const slice = file.slice(offset, o + chunkSize);
-      fileReader.readAsArrayBuffer(slice);
-    }
-    readSlice(0);
-  };
-  dataChannel.onclose = () => {};
 
-  peerConnection.onicecandidate = e => {
-    if (e.candidate) socket.emit('signal', { room: currentRoom, data: { candidate: e.candidate } });
-  };
-
-  peerConnection.createOffer().then(offer => {
-    return peerConnection.setLocalDescription(offer);
-  }).then(() => {
-    socket.emit('signal', { room: currentRoom, data: { sdp: peerConnection.localDescription } });
-  });
+    socket.on('signal', async ({ data }) => {
+      console.log("RECV: Received signal", data);
+      if (data.sdp) {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        if (data.sdp.type === 'offer') {
+          const answer = await peerConnection.createAnswer();
+          await peerConnection.setLocalDescription(answer);
+          socket.emit('signal', { room: currentRoom, data: { sdp: peerConnection.localDescription } });
+        }
+      } else if (data.candidate) {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        console.log("RECV: ICE candidate added");
+      }
+    });
+  }
 };
 
-socket.on('signal', async ({ data }) => {
-  if (!peerConnection || !data) return;
-  if (data.sdp) {
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
-    if (data.sdp.type === 'offer') {
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
-      socket.emit('signal', { room: currentRoom, data: { sdp: peerConnection.localDescription } });
-    }
-  } else if (data.candidate) {
-    try { await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); }
-    catch (e) {}
-  }
-});
 
 socket.on('new-participant', () => {
   // No action needed, sending starts when sender clicks Start Transfer
